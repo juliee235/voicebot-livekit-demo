@@ -1,0 +1,8 @@
+{
+  "trunk": {
+    "name": "thai-voicebot-demo",
+    "numbers": ["+66XXXXXXXXX"],
+    "authUsername": "CHANGE_ME_USER",
+    "authPassword": "CHANGE_ME_PASSWORD"
+  }
+}

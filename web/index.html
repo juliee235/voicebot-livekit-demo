@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thai Voicebot Demo</title>
+  <style>
+    :root {
+      --bg: #f6f6f4; --card: #ffffff; --text: #1d1d1b; --muted: #6b6b66;
+      --accent: #e8590c; --accent-text: #ffffff; --danger: #c92a2a;
+      --user: #eef2ff; --agent: #fff4e6; --border: #e4e4e0;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #161615; --card: #20201e; --text: #ededea; --muted: #9a9a94;
+        --accent: #ff8a3d; --accent-text: #1d1d1b; --danger: #ff6b6b;
+        --user: #262b3d; --agent: #3a2a1a; --border: #33332f;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+      font-family: system-ui, -apple-system, "Sarabun", "Noto Sans Thai", sans-serif;
+      display: flex; justify-content: center; padding: 32px 16px;
+    }
+    main {
+      width: 100%; max-width: 560px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 16px;
+    }
+    h1 { margin: 0; font-size: 22px; }
+    .sub { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+    .controls { display: flex; align-items: center; gap: 12px; }
+    button {
+      border: 0; border-radius: 999px; padding: 12px 24px; font-size: 16px; font-weight: 600;
+      background: var(--accent); color: var(--accent-text); cursor: pointer;
+    }
+    button.hangup { background: var(--danger); color: #fff; }
+    button:disabled { opacity: .5; cursor: default; }
+    #status { color: var(--muted); font-size: 14px; }
+    #log {
+      height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+      border-top: 1px solid var(--border); padding-top: 16px;
+    }
+    .line { padding: 8px 12px; border-radius: 12px; max-width: 85%; line-height: 1.5; }
+    .line.user { background: var(--user); align-self: flex-end; }
+    .line.agent { background: var(--agent); align-self: flex-start; }
+  </style>
+</head>
+<body>
+  <main>
+    <div>
+      <h1>Thai Voicebot</h1>
+      <p class="sub">Soniox · Gemini · LiveKit</p>
+    </div>
+    <div class="controls">
+      <button id="call">เริ่มคุย</button>
+      <span id="status">พร้อม</span>
+    </div>
+    <div id="log"></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.22.3/dist/livekit-client.umd.js"></script>
+  <script>
+    const { Room, RoomEvent, Track } = LivekitClient;
+    const btn = document.getElementById("call");
+    const statusEl = document.getElementById("status");
+    const log = document.getElementById("log");
+    const lines = new Map();
+    let room = null;
+
+    const setStatus = (text) => (statusEl.textContent = text);
+
+    btn.onclick = () => (room ? room.disconnect() : start());
+
+    async function start() {
+      btn.disabled = true;
+      setStatus("กำลังเชื่อมต่อ...");
+      try {
+        const { url, token } = await (await fetch("/token")).json();
+        room = new Room();
+        room.on(RoomEvent.TrackSubscribed, (track) => {
+          if (track.kind === Track.Kind.Audio) document.body.appendChild(track.attach());
+        });
+        room.on(RoomEvent.ParticipantConnected, (p) => {
+          if (p.isAgent) setStatus("เชื่อมต่อแล้ว พูดได้เลย");
+        });
+        room.on(RoomEvent.Disconnected, reset);
+        room.registerTextStreamHandler("lk.transcription", onTranscript);
+
+        await room.connect(url, token);
+        await room.localParticipant.setMicrophoneEnabled(true);
+        setStatus("รอเอเจนต์เข้าห้อง...");
+        btn.textContent = "วางสาย";
+        btn.classList.add("hangup");
+      } catch (err) {
+        setStatus("เกิดข้อผิดพลาด: " + err.message);
+        room?.disconnect();
+        reset();
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // User transcripts arrive as a full text per stream; agent transcripts arrive as deltas.
+    async function onTranscript(reader, participantInfo) {
+      const segmentId = reader.info.attributes?.["lk.segment_id"] ?? reader.info.id;
+      const isUser = participantInfo.identity === room.localParticipant.identity;
+      const line = lineFor(segmentId, isUser ? "user" : "agent");
+      if (isUser) {
+        line.textContent = await reader.readAll();
+      } else {
+        for await (const chunk of reader) {
+          line.textContent += chunk;
+          log.scrollTop = log.scrollHeight;
+        }
+      }
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function lineFor(id, who) {
+      if (!lines.has(id)) {
+        const el = document.createElement("div");
+        el.className = "line " + who;
+        log.appendChild(el);
+        lines.set(id, el);
+      }
+      return lines.get(id);
+    }
+
+    function reset() {
+      room = null;
+      document.querySelectorAll("audio").forEach((el) => el.remove());
+      btn.textContent = "เริ่มคุย";
+      btn.classList.remove("hangup");
+      setStatus("วางสายแล้ว");
+    }
+  </script>
+</body>
+</html>

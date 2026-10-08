@@ -1,0 +1,10 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.wav
+.git/
+Dockerfile
+docker-compose.yml
+orders.jsonl
+google-service-account.json

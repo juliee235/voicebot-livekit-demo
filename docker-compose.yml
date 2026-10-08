@@ -1,0 +1,37 @@
+# docker compose up --build
+#   agent: LiveKit agent (STT + Gemini + TTS), connects out to LiveKit Cloud
+#   web:   token server + browser demo on http://localhost:8000
+#
+# For STT_PROVIDER/TTS_PROVIDER=local, set LOCAL_MODELS=1 in .env so the models (~1 GB)
+# are baked into the image, and give Docker at least 4 GB of memory.
+
+x-app: &app
+  build:
+    context: .
+    args:
+      LOCAL_MODELS: ${LOCAL_MODELS:-0}
+  image: thai-voicebot
+  env_file: .env
+  restart: unless-stopped
+
+services:
+  agent:
+    <<: *app
+    command: ["python", "agent.py", "start"]
+    # with GOOGLE_SHEET_ID set, mount the service account key (it is kept out of the image)
+    # volumes:
+    #   - ./google-service-account.json:/app/google-service-account.json:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+
+  web:
+    <<: *app
+    command: ["uvicorn", "web.server:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      - agent

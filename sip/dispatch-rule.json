@@ -1,0 +1,10 @@
+{
+  "dispatch_rule": {
+    "name": "thai-voicebot-demo",
+    "rule": {
+      "dispatchRuleIndividual": {
+        "roomPrefix": "call-"
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+[project]
+name = "voicebot-demo"
+version = "0.1.0"
+description = "Thai voicebot demo on LiveKit (WebRTC + SIP): Soniox STT/TTS (or local models), Gemini via LiveKit Inference"
+requires-python = ">=3.11, <3.13"
+dependencies = [
+    "livekit-agents[silero,soniox]~=1.8",
+    "pythaiasr>=2.3",
+    "pythaitts>=0.7",
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+    "gspread>=6",
+]
+
+[tool.uv]
+package = false
